@@ -11,27 +11,55 @@ function generateRandomUsername() {
 }
 
 function connect() {
-    var socket = new SockJS('/ws');
-    stompClient = Stomp.over(socket);
-    stompClient.connect({}, function (frame) {
-        console.log('Connected: ' + frame);
-        stompClient.subscribe('/topic/messages', function (message) {
-            showMessage(JSON.parse(message.body));
-        });
+    stompClient = new StompJs.Client({
+        brokerURL: 'ws://localhost:8080/ws/websocket',
+        onConnect: function () {
+            stompClient.subscribe('/topic/messages', function (message) {
+                showMessage(JSON.parse(message.body));
+            });
+        }
     });
+    stompClient.activate();
 }
+//function connect() {
+//    var socket = new SockJS('/ws');
+//    stompClient = Stomp.over(socket);
+//    stompClient.connect({}, function (frame) {
+//        console.log('Connected: ' + frame);
+//        stompClient.subscribe('/topic/messages', function (message) {
+//            showMessage(JSON.parse(message.body));
+//        });
+//    });
+//}
 
 function sendMessage() {
     var messageContent = document.getElementById('message-input').value;
-    stompClient.send("/app/chat", {}, JSON.stringify({'username': username, 'content': messageContent}));
+    stompClient.publish({
+        destination: '/app/chat',
+        body: JSON.stringify({ username: username, content: messageContent })
+    });
     document.getElementById('message-input').value = '';
 }
+//function sendMessage() {
+//    var messageContent = document.getElementById('message-input').value;
+//    stompClient.publish("/app/chat", {}, JSON.stringify({'username': username, 'content': messageContent}));
+//    document.getElementById('message-input').value = '';
+//}
 
 function showMessage(message) {
     var messagesDiv = document.getElementById('messages');
     var messageElement = document.createElement('div');
-    messageElement.appendChild(document.createTextNode(message.username + ": " + message.content));
+    messageElement.appendChild(document.createTextNode(
+        message.username + ": " + message.content + " (" + new Date(message.timestamp).toLocaleTimeString() + ")"
+    ));
     messagesDiv.appendChild(messageElement);
 }
+
+//function showMessage(message) {
+//    var messagesDiv = document.getElementById('messages');
+//    var messageElement = document.createElement('div');
+//    messageElement.appendChild(document.createTextNode(message.username + ": " + message.content));
+//    messagesDiv.appendChild(messageElement);
+//}
 
 connect();
