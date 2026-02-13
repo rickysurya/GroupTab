@@ -1,8 +1,11 @@
 package io.grouptab.model;
 
+import java.time.Instant;
+
 public class ChatMessage {
     private String content;
     private String username;
+    private Instant timestamp;
 
     public String getContent() {
         return content;
@@ -20,4 +23,11 @@ public class ChatMessage {
         this.username = username;
     }
 
+    public Instant getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(Instant timestamp) {
+        this.timestamp = timestamp;
+    }
 }
