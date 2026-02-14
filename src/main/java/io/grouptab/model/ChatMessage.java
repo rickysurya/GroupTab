@@ -1,33 +1,27 @@
 package io.grouptab.model;
 
 import java.time.Instant;
+import jakarta.persistence.*;
+import lombok.Data;
 
+
+@Entity
+@Data
 public class ChatMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
     private String content;
     private String username;
     private Instant timestamp;
 
-    public String getContent() {
-        return content;
+    @Enumerated(EnumType.STRING)
+    private MessageType messageType;
+
+    public enum MessageType{
+        CHAT, JOIN, LEAVE
     }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public Instant getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(Instant timestamp) {
-        this.timestamp = timestamp;
-    }
 }
