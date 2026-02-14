@@ -10,6 +10,20 @@ function generateRandomUsername() {
     return adjective + noun + Math.floor(Math.random() * 1000);
 }
 
+async function loadHistory(){
+    try {
+        const response = await fetch('http://localhost:8080/api/chat/history');
+        if (!response.ok) throw new Error('Failed retrieving chat history');
+        const history = await response.json();
+
+        history.reverse().forEach(msg => {
+            showMessage(msg);
+        })
+    } catch (error) {
+        console.error("Could not load history : ", error);
+    }
+}
+
 function connect() {
     stompClient = new StompJs.Client({
         brokerURL: 'ws://localhost:8080/ws/websocket',
@@ -21,16 +35,6 @@ function connect() {
     });
     stompClient.activate();
 }
-//function connect() {
-//    var socket = new SockJS('/ws');
-//    stompClient = Stomp.over(socket);
-//    stompClient.connect({}, function (frame) {
-//        console.log('Connected: ' + frame);
-//        stompClient.subscribe('/topic/messages', function (message) {
-//            showMessage(JSON.parse(message.body));
-//        });
-//    });
-//}
 
 function sendMessage() {
     var messageContent = document.getElementById('message-input').value;
@@ -40,26 +44,21 @@ function sendMessage() {
     });
     document.getElementById('message-input').value = '';
 }
-//function sendMessage() {
-//    var messageContent = document.getElementById('message-input').value;
-//    stompClient.publish("/app/chat", {}, JSON.stringify({'username': username, 'content': messageContent}));
-//    document.getElementById('message-input').value = '';
-//}
 
 function showMessage(message) {
     var messagesDiv = document.getElementById('messages');
     var messageElement = document.createElement('div');
+
+    // handle cases where timestamp might be null
+    var timeStr = message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : "Just now";
     messageElement.appendChild(document.createTextNode(
-        message.username + ": " + message.content + " (" + new Date(message.timestamp).toLocaleTimeString() + ")"
+        message.username + ": " + message.content + " (" + timeStr + ")"
     ));
     messagesDiv.appendChild(messageElement);
+
+    // Auto-scroll to the bottom of the chat
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-//function showMessage(message) {
-//    var messagesDiv = document.getElementById('messages');
-//    var messageElement = document.createElement('div');
-//    messageElement.appendChild(document.createTextNode(message.username + ": " + message.content));
-//    messagesDiv.appendChild(messageElement);
-//}
 
 connect();
