@@ -3,10 +3,12 @@ package io.grouptab.model;
 import java.time.Instant;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 
 @Entity
 @Data
+@NoArgsConstructor
 public class ChatMessage {
 
     @Id

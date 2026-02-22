@@ -5,6 +5,7 @@ import io.grouptab.repository.ChatMessageRepository;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.List;
 
 @Controller
+@CrossOrigin(origins = "*")
 public class ChatController {
 
     private final ChatMessageRepository repository;
@@ -24,10 +26,11 @@ public class ChatController {
     @SendTo("/topic/messages")
     public ChatMessage send(ChatMessage message){
         message.setTimestamp(Instant.now());
+        repository.save(message);
         return message;
     }
 
-    @GetMapping("/api/chat/history")
+    @GetMapping("/chat/history")
     @ResponseBody
     public List<ChatMessage> getHistory(){
         return repository.findTop50ByOrderByTimestampDesc();

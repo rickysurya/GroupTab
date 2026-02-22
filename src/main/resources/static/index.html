@@ -1,18 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Demo Chatroom</title>
-    <link rel="stylesheet" type="text/css" href="main.css">
+    <meta charset="UTF-8">
+    <title>GroupTab Chat</title>
+    <link rel="stylesheet" href="main.css">
 </head>
 <body>
-<div id="chatroom">
-    <h1>Chatroom</h1>
-    <div id="messages"></div>
-    <input type="text" id="message-input" placeholder="Type a message...">
-    <button onclick="sendMessage()">Send</button>
+<div class="main-container">
+    <aside class="side-panel">
+        <div class="profile-section">
+            <div class="avatar" id="user-avatar">?</div>
+            <h3 id="display-username">Loading...</h3>
+            <span class="status-online">Online</span>
+        </div>
+        <nav class="channels">
+            <h4>Channels</h4>
+            <ul>
+                <li class="active"># general</li>
+                <li># random</li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="chat-area">
+        <header class="chat-header">
+            <h2># general</h2>
+        </header>
+
+        <div id="messages" class="message-container"></div>
+
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button onclick="sendMessage()" id="send-btn">Send</button>
+        </div>
+    </main>
 </div>
 
-<!--stomp1.2-->
 <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
