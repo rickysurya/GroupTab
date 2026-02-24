@@ -1,5 +1,7 @@
 package io.grouptab.service;
 
+import io.grouptab.exception.GroupNotFoundException;
+import io.grouptab.exception.UnauthorizedException;
 import io.grouptab.model.ChatGroup;
 import io.grouptab.repository.ChatGroupRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,11 +22,14 @@ public class ChatGroupService {
     }
 
     public void deleteGroup(Long id, String requestingUser){
-        if (chatGroupRepository.findById(id)){
-            chatGroupRepository.deleteById(id);
-        } else {
+        ChatGroup group = chatGroupRepository.findById(id)
+                .orElseThrow(() -> new GroupNotFoundException(id));
 
+        if (!group.getAdminUsername().equals(requestingUser)) {
+            throw new UnauthorizedException("Only the channel admin can delete it");
         }
+
+        chatGroupRepository.deleteById(id);
 
     }
 }

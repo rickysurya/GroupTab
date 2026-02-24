@@ -2,37 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GroupTab Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GroupTab</title>
     <link rel="stylesheet" href="main.css">
 </head>
 <body>
-<div class="main-container">
-    <aside class="side-panel">
-        <div class="profile-section">
+<div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-profile">
             <div class="avatar" id="user-avatar">?</div>
-            <h3 id="display-username">Loading...</h3>
-            <span class="status-online">Online</span>
-        </div>
-        <nav class="channels">
-            <div class="sidebar-header">
-                <h4>Channels</h4>
-                <button onclick="promptNewGroup()" class="add-btn">+</button>
+            <div class="profile-info">
+                <span id="display-username">Loading...</span>
+                <span class="status-dot">● Online</span>
             </div>
-            <ul id="group-list">
-            </ul>
-        </nav>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-header">
+                <span>Channels</span>
+                <button class="btn-icon" onclick="promptNewGroup()" title="New channel">+</button>
+            </div>
+            <ul id="group-list" class="channel-list"></ul>
+        </div>
     </aside>
 
-    <main class="chat-area">
+    <!-- Main Chat -->
+    <main class="chat">
         <header class="chat-header">
-            <h2># general</h2>
+            <h2 id="chat-title"># general</h2>
+            <button class="btn-danger" onclick="deleteCurrentGroup()" id="delete-btn" title="Delete channel">Delete</button>
         </header>
 
-        <div id="messages" class="message-container"></div>
+        <div id="messages" class="messages"></div>
 
-        <div class="input-area">
-            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-            <button onclick="sendMessage()" id="send-btn">Send</button>
+        <div class="chat-input">
+            <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Message..."
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter') sendMessage()"
+            />
+            <button class="btn-primary" onclick="sendMessage()">Send</button>
         </div>
     </main>
 </div>

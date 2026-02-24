@@ -1,6 +1,8 @@
 package io.grouptab.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,9 +22,13 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank(message = "Message content must not be blank")
+    @Size(max = 2000, message = "Message must not exceed 2000 characters")
     @Column(nullable = false, length = 2000)
     private String content;
 
+    @NotBlank(message = "Username must not be blank")
+    @Size(max = 100, message = "Username must not exceed 100 characters")
     @Column(nullable = false)
     private String username;
 

@@ -14,7 +14,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Value("${rabbitmq.stomp.host:rabbitmq}")
     private String relayHost;
 
-    @Value("${rabbitmq.stomp.port:61613")
+    @Value("${rabbitmq.stomp.port:61613}")
     private int relayPort;
 
     @Value("${rabbitmq.stomp.login:guest}")

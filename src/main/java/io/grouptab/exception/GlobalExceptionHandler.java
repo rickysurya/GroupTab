@@ -13,7 +13,7 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ── Validation failures (@Valid) ─────────────────────────────────────────
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         List<String> errors = ex.getBindingResult()
@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.BAD_REQUEST, "Validation failed", errors));
     }
 
-    // ── Group not found ──────────────────────────────────────────────────────
+
     @ExceptionHandler(GroupNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleGroupNotFound(GroupNotFoundException ex) {
         return ResponseEntity
@@ -35,7 +35,6 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.NOT_FOUND, ex.getMessage(), null));
     }
 
-    // ── Unauthorized (wrong admin) ───────────────────────────────────────────
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity
@@ -43,7 +42,6 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.FORBIDDEN, ex.getMessage(), null));
     }
 
-    // ── Catch-all ────────────────────────────────────────────────────────────
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
         return ResponseEntity

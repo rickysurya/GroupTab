@@ -6,18 +6,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController
+@Controller
 @RequiredArgsConstructor
 public class ChatController {
 
     private final ChatService chatService;
 
     @MessageMapping("/chat/{groupId}")
-    @SendTo("/topic/group/{groupId}")
+    @SendTo("/topic/group.{groupId}")
     public ChatMessage sendMessage(@DestinationVariable Long groupId, ChatMessage message){
         return chatService.sendMessage(groupId, message);
     }

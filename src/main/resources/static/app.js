@@ -1,211 +1,221 @@
+// ── Config ──────────────────────────────────────────────────────────────────
+const API_BASE   = `${location.protocol}//${location.host}`;
+const WS_URL     = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
-var username = generateRandomUsername();
+// ── State ────────────────────────────────────────────────────────────────────
+const username        = generateUsername();
+let   currentGroupId  = null;
+let   currentSub      = null;
 
-document.getElementById('display-username').innerText = username;
-document.getElementById('user-avatar').innerText = username.charAt(0);
-
-function generateRandomUsername() {
-    var adjectives = ["Quick", "Lazy", "Happy", "Sad", "Angry"];
-    var nouns = ["Fox", "Dog", "Cat", "Mouse", "Bear"];
-    var adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    var noun = nouns[Math.floor(Math.random() * nouns.length)];
-    return adjective + noun + Math.floor(Math.random() * 1000);
-}
-
-
-
+// ── STOMP Client ─────────────────────────────────────────────────────────────
 const stompClient = new StompJs.Client({
-    brokerURL: 'ws://localhost:8080/ws',
-    reconnectDelay: 5000,
+    brokerURL:        WS_URL,
+    reconnectDelay:   5000,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
+    onConnect:   onConnected,
+    onStompError: frame => console.error('STOMP error:', frame.headers['message'], frame.body),
+    onDisconnect: ()    => console.log('Disconnected'),
 });
 
-function connect() {
-    stompClient.onConnect = async (frame) => {
-        console.log('Connected: ' + frame);
-        const groups = await loadGroups();
-        if (groups && groups.length > 0) {
-            setTimeout(() => switchGroup(groups[0].id, groups[0].name), 300);
-        }
-    };
-
-    stompClient.onStompError = (frame) => { /* your error logs */ };
-
-    stompClient.activate();
-}
-//function connect() {
-//    console.log("starting stomp connection");
-//    stompClient = new StompJs.Client({
-//        brokerURL: 'ws://localhost:8080/ws',
-//        onConnect: async (frame) => {
-//            console.log('Connected: ' + frame);
-//
-//            const groups = await loadGroups();
-//            if (groups && groups.length > 0){
-//                switchGroup(groups[0].id, groups[0].name);
-//            } else {
-//                document.querySelector('.chat-header h2').innerText = "Create a group to start!";
-//            }
-//
-////            stompClient.subscribe('/topic/messages', function (message) {
-////                showMessage(JSON.parse(message.body));
-////            });
-//        }, onStompError: (frame) => {
-//                       console.error('Broker reported error: ' + frame.headers['message']);
-//                       console.error('Additional details: ' + frame.body);
-//        }
-//    });
-//    stompClient.activate();
-//    console.log("stomp client activated");
-//}
-
-let currentGroupId = null;
-let currentSubscription = null;
-
-async function loadGroups() {
-    try {
-        const response = await fetch('http://localhost:8080/api/groups');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const groups = await response.json();
-        const list = document.getElementById('group-list');
-        list.innerHTML = '';
-
-        groups.forEach(group => {
-            const li = document.createElement('li');
-            li.innerText = `# ${group.name}`;
-            li.dataset.groupId = group.id;  // ✅ ADD THIS
-            li.onclick = () => switchGroup(group.id, group.name);
-            if (group.id === currentGroupId) li.classList.add('active');
-            list.appendChild(li);
-        });
-        // for connect function
-        return groups;
-    } catch (error) {
-        console.error("Failed to load groups:", error);
-        // User feedback: Let them know the sidebar failed
-        document.getElementById('group-list').innerHTML = '<li class="error">Failed to load channels</li>';
+async function onConnected(frame) {
+    console.log('Connected:', frame);
+    const groups = await fetchGroups();
+    if (groups.length > 0) {
+        switchGroup(groups[0].id, groups[0].name);
+    } else {
+        setTitle('Create a channel to get started');
     }
 }
 
-// 2. Switch context to a new group
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+document.getElementById('display-username').textContent = username;
+document.getElementById('user-avatar').textContent      = username.charAt(0).toUpperCase();
+stompClient.activate();
+
+// ── Groups ───────────────────────────────────────────────────────────────────
+async function fetchGroups() {
+    try {
+        const res = await fetch(`${API_BASE}/api/groups`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+
+        const groups = await res.json();
+        renderGroupList(groups);
+        return groups;
+    } catch (err) {
+        console.error('Failed to load groups:', err);
+        document.getElementById('group-list').innerHTML =
+            '<li class="error">⚠ Could not load channels</li>';
+        return [];
+    }
+}
+
+function renderGroupList(groups) {
+    const list = document.getElementById('group-list');
+    list.innerHTML = '';
+    groups.forEach(g => {
+        const li = document.createElement('li');
+        li.textContent     = `# ${g.name}`;
+        li.dataset.groupId = g.id;
+        li.onclick         = () => switchGroup(g.id, g.name);
+        if (g.id === currentGroupId) li.classList.add('active');
+        list.appendChild(li);
+    });
+}
+
 function switchGroup(groupId, groupName) {
     if (currentGroupId === groupId) return;
-
     currentGroupId = groupId;
-    document.querySelector('.chat-header h2').innerText = `# ${groupName}`;
 
-    // Clear old messages from view
-    document.getElementById('messages').innerHTML = "";
+    setTitle(`# ${groupName}`);
+    document.getElementById('messages').innerHTML = '';
 
-    // Unsubscribe from the old group topic if it exists
-    if (currentSubscription) {
-        currentSubscription.unsubscribe();
-        currentSubscription = null;
-    }
+    // Unsubscribe old
+    currentSub?.unsubscribe();
 
-    // Subscribe to the NEW group topic
-    currentSubscription = stompClient.subscribe(`/topic/group/${groupId}`, (message) => {
-            showMessage(JSON.parse(message.body));
+    // Subscribe new
+    currentSub = stompClient.subscribe(`/topic/group.${groupId}`, msg => {
+        appendMessage(JSON.parse(msg.body));
     });
-    // Load history for this specific group
+
     loadHistory(groupId);
-    //
-        document.querySelectorAll('#group-list li').forEach(li => {
-            li.classList.toggle('active', li.dataset.groupId == groupId);
-        });
+    highlightActiveGroup(groupId);
+}
+
+function highlightActiveGroup(groupId) {
+    document.querySelectorAll('#group-list li').forEach(li => {
+        li.classList.toggle('active', Number(li.dataset.groupId) === groupId);
+    });
 }
 
 async function promptNewGroup() {
-    const name = prompt("Enter group name:");
-    if (!name || name.trim() === "") return;
+    const name = prompt('Channel name:')?.trim();
+    if (!name) return;
 
     try {
-        const response = await fetch('http://localhost:8080/api/groups', {
-            method: 'POST',
+        const res = await fetch(`${API_BASE}/api/groups`, {
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, adminUsername: username })
+            body:    JSON.stringify({ name, adminUsername: username }),
         });
-
-        if (!response.ok) throw new Error("Could not create group");
-
-        await loadGroups(); // Refresh list on success
-    } catch (error) {
-        console.error("Group creation failed:", error);
-        alert("Oops! Could not create the group. Is the server running?");
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        await fetchGroups();
+    } catch (err) {
+        alert('Could not create channel. Is the server running?');
+        console.error(err);
     }
 }
 
 async function deleteCurrentGroup() {
-    if (!currentGroupId) return;
-    if (!confirm("Are you sure you want to delete this group?")) return;
+    if (!currentGroupId)                              return;
+    if (!confirm('Delete this channel permanently?')) return;
 
     try {
-        const response = await fetch(`http://localhost:8080/api/groups/${currentGroupId}?admin=${username}`, {
-            method: 'DELETE'
-        });
+        const res = await fetch(
+            `${API_BASE}/api/groups/${currentGroupId}?admin=${encodeURIComponent(username)}`,
+            { method: 'DELETE' }
+        );
+        if (res.status === 403) throw new Error('Only the channel admin can delete it.');
+        if (!res.ok)            throw new Error(`Delete failed (${res.status})`);
 
-        if (!response.ok) throw new Error("Delete failed. Are you the admin?");
-
-        // Cleanup UI after deletion
+        currentSub?.unsubscribe();
+        currentSub     = null;
         currentGroupId = null;
-        if (currentSubscription) currentSubscription.unsubscribe();
-        document.getElementById('messages').innerHTML = "";
-        document.querySelector('.chat-header h2').innerText = "Select a Channel";
 
-        await loadGroups();
-    } catch (error) {
-        alert(error.message);
+        document.getElementById('messages').innerHTML = '';
+        setTitle('Select a channel');
+        await fetchGroups();
+    } catch (err) {
+        alert(err.message);
     }
 }
 
-async function loadHistory(groupId){
-    if (!groupId) return;
+// ── Messages ─────────────────────────────────────────────────────────────────
+async function loadHistory(groupId) {
     try {
-        const response = await fetch(`http://localhost:8080/chat/history/${groupId}`);
-        if (!response.ok) throw new Error('Failed retrieving chat history');
-        const history = await response.json();
-        document.getElementById('messages').innerHTML = "";
-        history.reverse().forEach(msg => {
-            showMessage(msg);
-        })
-    } catch (error) {
-        console.error("Could not load history : ", error);
+        const res = await fetch(`${API_BASE}/chat/history/${groupId}`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const history = await res.json();
+        document.getElementById('messages').innerHTML = '';
+        history.forEach(msg => appendMessage(msg));
+    } catch (err) {
+        console.error('Could not load history:', err);
     }
 }
 
 function sendMessage() {
-    var messageContent = document.getElementById('message-input').value;
-        if (!currentGroupId) return alert("Select a group first!");
+    const input   = document.getElementById('message-input');
+    const content = input.value.trim();
+    if (!content)        { return; }
+    if (!currentGroupId) { alert('Select a channel first!'); return; }
 
-        stompClient.publish({
-            destination: `/app/chat/${currentGroupId}`, // Match the Java @MessageMapping
-            body: JSON.stringify({
-                username: username,
-                content: messageContent,
-                groupId: currentGroupId
-            })
-        });
-        document.getElementById('message-input').value = '';
+    stompClient.publish({
+        destination: `/app/chat/${currentGroupId}`,
+        body: JSON.stringify({
+            username,
+            content,
+            groupId:     currentGroupId,
+            messageType: 'CHAT',
+        }),
+    });
+
+    input.value = '';
 }
 
-function showMessage(message) {
-    var messagesDiv = document.getElementById('messages');
-    var messageElement = document.createElement('div');
+function appendMessage(msg) {
+    const container = document.getElementById('messages');
 
-    // handle cases where timestamp might be null
-    var timeStr = message.timestamp ? new Date(message.timestamp).toLocaleTimeString() : "Just now";
-    messageElement.appendChild(document.createTextNode(
-        message.username + ": " + message.content + " (" + timeStr + ")"
-    ));
-    messagesDiv.appendChild(messageElement);
+    // System messages (JOIN / LEAVE)
+    if (msg.messageType === 'JOIN' || msg.messageType === 'LEAVE') {
+        const el = document.createElement('div');
+        el.className   = 'msg-system';
+        el.textContent = `${msg.username} ${msg.messageType === 'JOIN' ? 'joined' : 'left'} the channel`;
+        container.appendChild(el);
+        scrollToBottom();
+        return;
+    }
 
-    // Auto-scroll to the bottom of the chat
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    const isOwn = msg.username === username;
+    const time  = msg.timestamp
+        ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'now';
+
+    const msgEl = document.createElement('div');
+    msgEl.className = `msg${isOwn ? ' own' : ''}`;
+    msgEl.innerHTML = `
+        <div class="msg-meta">
+            <span class="msg-author">${escapeHtml(msg.username)}</span>
+            <span class="msg-time">${time}</span>
+        </div>
+        <div class="msg-bubble">${escapeHtml(msg.content)}</div>
+    `;
+
+    container.appendChild(msgEl);
+    scrollToBottom();
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setTitle(text) {
+    document.getElementById('chat-title').textContent = text;
+}
 
-connect();
+function scrollToBottom() {
+    const el = document.getElementById('messages');
+    el.scrollTop = el.scrollHeight;
+}
 
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
+function generateUsername() {
+    const adj  = ['Quick', 'Lazy', 'Happy', 'Bold', 'Calm', 'Witty', 'Bright'];
+    const noun = ['Fox', 'Bear', 'Wolf', 'Hawk', 'Lynx', 'Puma', 'Crow'];
+    return adj[Math.floor(Math.random() * adj.length)]
+         + noun[Math.floor(Math.random() * noun.length)]
+         + Math.floor(Math.random() * 1000);
+}
