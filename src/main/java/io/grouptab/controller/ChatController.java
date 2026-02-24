@@ -1,38 +1,32 @@
 package io.grouptab.controller;
 
 import io.grouptab.model.ChatMessage;
-import io.grouptab.repository.ChatMessageRepository;
+import io.grouptab.service.ChatService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.List;
 
-@Controller
-@CrossOrigin(origins = "*")
+@RestController
+@RequiredArgsConstructor
 public class ChatController {
 
-    private final ChatMessageRepository repository;
+    private final ChatService chatService;
 
-    public ChatController(ChatMessageRepository repository){
-        this.repository = repository;
+    @MessageMapping("/chat/{groupId}")
+    @SendTo("/topic/group/{groupId}")
+    public ChatMessage sendMessage(@DestinationVariable Long groupId, ChatMessage message){
+        return chatService.sendMessage(groupId, message);
     }
 
-    @MessageMapping("/chat")
-    @SendTo("/topic/messages")
-    public ChatMessage send(ChatMessage message){
-        message.setTimestamp(Instant.now());
-        repository.save(message);
-        return message;
-    }
-
-    @GetMapping("/chat/history")
+    @GetMapping("/chat/history/{groupId}")
     @ResponseBody
-    public List<ChatMessage> getHistory(){
-        return repository.findTop50ByOrderByTimestampDesc();
+    // TODO Replace with frontend url in the future
+    @CrossOrigin(origins = "*")
+    public List<ChatMessage> getHistory(@PathVariable Long groupId){
+        return chatService.getHistory(groupId);
     }
 }

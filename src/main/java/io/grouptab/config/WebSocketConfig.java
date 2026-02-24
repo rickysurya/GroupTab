@@ -1,5 +1,6 @@
 package io.grouptab.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -10,21 +11,33 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    @Value("${rabbitmq.stomp.host:rabbitmq}")
+    private String relayHost;
+
+    @Value("${rabbitmq.stomp.port:61613")
+    private int relayPort;
+
+    @Value("${rabbitmq.stomp.login:guest}")
+    private String login;
+
+    @Value("${rabbitmq.stomp.passcode:guest}")
+    private String passcode;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableStompBrokerRelay("/topic", "/queue")
-                .setRelayHost("localhost")
-                .setRelayPort(61613)
-                .setClientLogin("guest")
-                .setClientPasscode("guest")
-                .setSystemLogin("guest")
-                .setSystemPasscode("guest");
+                .setRelayHost(relayHost)
+                .setRelayPort(relayPort)
+                .setClientLogin(login)
+                .setClientPasscode(passcode)
+                .setSystemLogin(login)
+                .setSystemPasscode(passcode);
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        //setallowedorigins to connect to frontend
-        registry.addEndpoint("/ws").setAllowedOrigins("*");
+        //TODO Replace allowedOriginPatterns
+        registry.addEndpoint("/ws").setAllowedOriginPatterns("*");
     }
 }

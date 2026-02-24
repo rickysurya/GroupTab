@@ -2,10 +2,11 @@ package io.grouptab.repository;
 
 import io.grouptab.model.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
+@Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
-
-    // Custom query method: "Find the top 50, order by time descending"
-    List<ChatMessage> findTop50ByOrderByTimestampDesc();
+    List<ChatMessage> findTop50ByGroupIdOrderByTimestampAsc(Long groupId);
 }
