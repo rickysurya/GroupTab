@@ -1,22 +1,3 @@
-#spring:
-#  application:
-#    name: GroupTab
-#  rabbitmq:
-#    host: localhost
-#    port: 5672
-#    username: guest
-#    password: guest
-#  datasource:
-#    url: jdbc:postgresql://localhost:5432/chat
-#    username: guest
-#    password: guest
-#  jpa:
-#    hibernate:
-#      ddl-auto: update
-#    show-sql: true
-#    properties:
-#      hibernate:
-#        format_sql: true
 spring:
   application:
     name: GroupTab
@@ -40,9 +21,12 @@ spring:
     username: guest
     password: guest
 
-rabbitmq:
-  stomp:
-    port: 61613
+stomp:
+  port: 61613
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production-minimum-32-chars}
+  expiration-ms: 86400000 # 24 hours
 
 server:
   port: 8080

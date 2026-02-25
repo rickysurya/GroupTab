@@ -1,35 +1,3 @@
-#version: '3.8'
-#
-#services:
-#  db:
-#    image: postgres:16
-#    container_name: chat-postgres
-#    environment:
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: password
-#      POSTGRES_DB: chat_db
-#    ports:
-#      - "5432:5432"
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#
-#  rabbitmq:
-#    build: .
-##    image: rabbitmq:3-management
-#    container_name: chat-rabbitmq
-#    ports:
-#      - "5672:5672"   # RabbitMQ Standard
-#      - "15672:15672" # Management UI
-#      - "61613:61613" # STOMP Plugin Port
-#    healthcheck:
-#      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#
-#volumes:
-#  postgres_data:
-
 version: '3.8'
 
 services:
@@ -79,6 +47,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: password
       RABBITMQ_HOST: rabbitmq
+      JWT_SECRET: A7d92F6b1E83C5A2D4B6F1E98C7A3D5B
     depends_on:
       postgres:
         condition: service_healthy

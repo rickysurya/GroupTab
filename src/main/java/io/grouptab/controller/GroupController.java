@@ -1,40 +1,38 @@
 package io.grouptab.controller;
 
 import io.grouptab.model.ChatGroup;
-import io.grouptab.service.ChatGroupService;
+import io.grouptab.service.GroupService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-
-@Slf4j
+// CHANGED: removed @CrossOrigin — handled globally by SecurityConfig now
 @RestController
 @RequestMapping("/api/groups")
 @RequiredArgsConstructor
-//TODO
-@CrossOrigin(origins = "*")
 public class GroupController {
 
-    private final ChatGroupService chatGroupService;
+    private final GroupService groupService;
 
     @GetMapping
     public List<ChatGroup> getAllGroups() {
-        return chatGroupService.getAllGroups();
+        return groupService.getAllGroups();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ChatGroup createGroup(@RequestBody ChatGroup group) {
-        return chatGroupService.createGroup(group);
+    public ChatGroup createGroup(@Valid @RequestBody ChatGroup group) {
+        return groupService.createGroup(group);
     }
 
+    // CHANGED: removed @RequestParam String admin — no longer needed, identity from JWT
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteGroup(@PathVariable Long id, @RequestParam String admin) {
-        chatGroupService.deleteGroup(id, admin);
+    public ResponseEntity<Void> deleteGroup(@PathVariable Long id) {
+        groupService.deleteGroup(id);
         return ResponseEntity.noContent().build();
     }
 }

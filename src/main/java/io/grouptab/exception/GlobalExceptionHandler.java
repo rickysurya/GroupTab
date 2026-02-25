@@ -7,12 +7,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
@@ -27,19 +27,11 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.BAD_REQUEST, "Validation failed", errors));
     }
 
-
-    @ExceptionHandler(GroupNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleGroupNotFound(GroupNotFoundException ex) {
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<Map<String, Object>> handleApp(AppException ex) {
         return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(errorBody(HttpStatus.NOT_FOUND, ex.getMessage(), null));
-    }
-
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException ex) {
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(errorBody(HttpStatus.FORBIDDEN, ex.getMessage(), null));
+                .status(ex.getStatus())
+                .body(errorBody(ex.getStatus(), ex.getMessage(), null));
     }
 
     @ExceptionHandler(Exception.class)
@@ -50,7 +42,7 @@ public class GlobalExceptionHandler {
     }
 
     private Map<String, Object> errorBody(HttpStatus status, String message, List<String> errors) {
-        var body = new java.util.LinkedHashMap<String, Object>();
+        var body = new LinkedHashMap<String, Object>();
         body.put("timestamp", Instant.now().toString());
         body.put("status",    status.value());
         body.put("error",     status.getReasonPhrase());
