@@ -4,19 +4,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GroupTab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="main.css">
 </head>
 <body>
-<div class="app">
 
-    <!-- Sidebar -->
+<!-- ── Auth Screen ───────────────────────────────────────────────── -->
+<div class="auth-screen" id="auth-screen">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <h1>GroupTab</h1>
+            <p>Sign in to continue</p>
+        </div>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchAuthTab('login')">Sign in</button>
+            <button class="auth-tab" onclick="switchAuthTab('register')">Register</button>
+        </div>
+
+        <div id="auth-error" class="auth-error hidden"></div>
+
+        <div class="auth-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="auth-username" placeholder="yourname" autocomplete="username" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="auth-password" placeholder="••••••••"
+                       autocomplete="current-password"
+                       onkeydown="if(event.key==='Enter') submitAuth()" />
+            </div>
+            <button class="btn-auth" id="auth-submit-btn" onclick="submitAuth()">Sign in</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Chat App ──────────────────────────────────────────────────── -->
+<div class="app hidden" id="app">
     <aside class="sidebar">
         <div class="sidebar-profile">
             <div class="avatar" id="user-avatar">?</div>
             <div class="profile-info">
-                <span id="display-username">Loading...</span>
-                <span class="status-dot">● Online</span>
+                <span id="display-username">...</span>
+                <span class="status-dot">● online</span>
             </div>
+            <button class="btn-logout" onclick="logout()" title="Sign out">↩</button>
         </div>
 
         <div class="sidebar-section">
@@ -28,23 +62,15 @@
         </div>
     </aside>
 
-    <!-- Main Chat -->
     <main class="chat">
         <header class="chat-header">
-            <h2 id="chat-title"># general</h2>
-            <button class="btn-danger" onclick="deleteCurrentGroup()" id="delete-btn" title="Delete channel">Delete</button>
+            <h2 id="chat-title">Select a channel</h2>
+            <button class="btn-danger" onclick="deleteCurrentGroup()">Delete</button>
         </header>
-
         <div id="messages" class="messages"></div>
-
         <div class="chat-input">
-            <input
-                    type="text"
-                    id="message-input"
-                    placeholder="Message..."
-                    autocomplete="off"
-                    onkeydown="if(event.key==='Enter') sendMessage()"
-            />
+            <input type="text" id="message-input" placeholder="Type a message..."
+                   autocomplete="off" onkeydown="if(event.key==='Enter') sendMessage()" />
             <button class="btn-primary" onclick="sendMessage()">Send</button>
         </div>
     </main>
