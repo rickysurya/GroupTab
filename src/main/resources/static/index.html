@@ -56,8 +56,20 @@
         <div class="sidebar-section">
             <div class="sidebar-section-header">
                 <span>Channels</span>
-                <button class="btn-icon" onclick="promptNewGroup()" title="New channel">+</button>
+                <button class="btn-icon" onclick="toggleNewChannel()" title="New channel" id="new-channel-btn">+</button>
             </div>
+
+            <!-- Inline new channel form — hidden by default -->
+            <div class="new-channel-form hidden" id="new-channel-form">
+                <input type="text" id="new-channel-input" placeholder="channel-name"
+                       maxlength="50"
+                       onkeydown="if(event.key==='Enter') confirmNewGroup(); if(event.key==='Escape') cancelNewGroup()" />
+                <div class="new-channel-actions">
+                    <button class="btn-confirm" onclick="confirmNewGroup()">Create</button>
+                    <button class="btn-cancel" onclick="cancelNewGroup()">Cancel</button>
+                </div>
+            </div>
+
             <ul id="group-list" class="channel-list"></ul>
         </div>
     </aside>
@@ -65,8 +77,18 @@
     <main class="chat">
         <header class="chat-header">
             <h2 id="chat-title">Select a channel</h2>
-            <button class="btn-danger" onclick="deleteCurrentGroup()">Delete</button>
+            <button class="btn-danger" onclick="showDeleteConfirm()">Delete</button>
         </header>
+
+        <!-- Delete confirmation banner — hidden by default -->
+        <div class="delete-confirm hidden" id="delete-confirm">
+            <span>⚠ Delete this channel? This cannot be undone.</span>
+            <div class="delete-confirm-actions">
+                <button class="btn-confirm-delete" onclick="confirmDelete()">Yes, delete</button>
+                <button class="btn-cancel-delete" onclick="hideDeleteConfirm()">Cancel</button>
+            </div>
+        </div>
+
         <div id="messages" class="messages"></div>
         <div class="chat-input">
             <input type="text" id="message-input" placeholder="Type a message..."
@@ -75,6 +97,9 @@
         </div>
     </main>
 </div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toast-container"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
 <script src="app.js"></script>

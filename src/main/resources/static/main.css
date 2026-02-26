@@ -472,3 +472,163 @@ button {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #ccc; }
+
+/* ── New Channel Inline Form ──────────────────────────────────────────── */
+.new-channel-form {
+    padding: 8px 10px;
+    border-bottom: 1px solid #1a1a1a;
+    background: #111;
+}
+
+.new-channel-form input {
+    width: 100%;
+    padding: 7px 10px;
+    background: #000;
+    border: 1px solid #333;
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--white);
+    outline: none;
+    margin-bottom: 6px;
+}
+
+.new-channel-form input:focus {
+    border-color: var(--accent);
+}
+
+.new-channel-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-confirm {
+    flex: 1;
+    padding: 6px;
+    background: var(--accent);
+    color: var(--black);
+    border: none;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+
+.btn-confirm:hover { background: #d4eb00; }
+
+.btn-cancel {
+    flex: 1;
+    padding: 6px;
+    background: transparent;
+    color: #666;
+    border: 1px solid #333;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+
+.btn-cancel:hover { border-color: #666; color: #999; background: transparent; }
+
+/* ── Delete Confirmation Banner ───────────────────────────────────────── */
+.delete-confirm {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 20px;
+    background: #fff0f0;
+    border-bottom: 2px solid #ff3333;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #cc0000;
+    animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.delete-confirm-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-confirm-delete {
+    padding: 5px 14px;
+    background: #ff3333;
+    color: white;
+    border: 2px solid #cc0000;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px #cc0000;
+}
+
+.btn-confirm-delete:hover { background: #cc0000; }
+
+.btn-cancel-delete {
+    padding: 5px 14px;
+    background: transparent;
+    color: #cc0000;
+    border: 2px solid #cc0000;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+
+.btn-cancel-delete:hover { background: #fff0f0; background: transparent; }
+
+/* ── Toast Notifications ──────────────────────────────────────────────── */
+.toast-container {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 10px 20px;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: var(--border);
+    box-shadow: var(--shadow);
+    animation: toastIn 0.2s ease;
+    pointer-events: all;
+    white-space: nowrap;
+}
+
+.toast.error   { background: #ff3333; color: white; border-color: #cc0000; box-shadow: 4px 4px 0px #cc0000; }
+.toast.success { background: var(--accent); color: var(--black); }
+.toast.info    { background: var(--black); color: var(--accent); }
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(12px); }
+}

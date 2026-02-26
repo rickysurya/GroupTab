@@ -3,40 +3,37 @@ const API_BASE = `${location.protocol}//${location.host}`;
 const WS_URL   = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 
 // ── Auth State ────────────────────────────────────────────────────────────────
-// Token and username are stored in sessionStorage so they survive page refresh
-// but are cleared when the browser tab is closed
 let token    = sessionStorage.getItem('token');
 let username = sessionStorage.getItem('username');
-let authMode = 'login'; // tracks which tab is active on the auth screen
+let authMode = 'login';
 
 // ── App State ─────────────────────────────────────────────────────────────────
 let currentGroupId = null;
 let currentSub     = null;
 
 // ── STOMP Client ──────────────────────────────────────────────────────────────
-// Defined here but only activated after login
 const stompClient = new StompJs.Client({
     brokerURL:         WS_URL,
     reconnectDelay:    5000,
     heartbeatIncoming: 4000,
     heartbeatOutgoing: 4000,
-
-    // NEW: send JWT in STOMP CONNECT headers so WebSocketAuthInterceptor can validate it
     connectHeaders: () => ({ Authorization: `Bearer ${token}` }),
-
     onConnect:    onConnected,
-    onStompError: frame => console.error('STOMP error:', frame.headers['message'], frame.body),
+    onStompError: frame => {
+        console.error('STOMP error:', frame.headers['message'], frame.body);
+        // CHANGED: was console.error only, now also shows a toast so user knows connection failed
+        showToast('Connection error — retrying...', 'error');
+    },
 });
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
-// If already logged in from a previous session, skip the auth screen
 if (token && username) {
     showApp();
 } else {
     showAuthScreen();
 }
 
-// ── Auth Screen ───────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function showAuthScreen() {
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
@@ -50,7 +47,6 @@ function showApp() {
     stompClient.activate();
 }
 
-// Switches between Login and Register tabs
 function switchAuthTab(mode) {
     authMode = mode;
     document.querySelectorAll('.auth-tab').forEach((tab, i) => {
@@ -60,7 +56,6 @@ function switchAuthTab(mode) {
     document.getElementById('auth-error').classList.add('hidden');
 }
 
-// Called when the submit button is clicked — routes to login or register
 async function submitAuth() {
     const usernameVal = document.getElementById('auth-username').value.trim();
     const passwordVal = document.getElementById('auth-password').value;
@@ -72,38 +67,34 @@ async function submitAuth() {
         return;
     }
 
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = 'Please wait...';
     errorEl.classList.add('hidden');
 
     try {
         const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-        const res = await fetch(`${API_BASE}${endpoint}`, {
+        const res  = await fetch(`${API_BASE}${endpoint}`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ username: usernameVal, password: passwordVal }),
         });
-
         const data = await res.json();
 
         if (!res.ok) {
-            // Show the error message from the server (e.g. "Username already taken")
             showAuthError(data.message || 'Something went wrong');
             return;
         }
 
-        // Save token and username — used for all subsequent requests
         token    = data.token;
         username = data.username;
         sessionStorage.setItem('token', token);
         sessionStorage.setItem('username', username);
-
         showApp();
     } catch (err) {
         showAuthError('Could not reach the server');
         console.error(err);
     } finally {
-        btn.disabled = false;
+        btn.disabled    = false;
         btn.textContent = authMode === 'login' ? 'Sign in' : 'Register';
     }
 }
@@ -114,7 +105,6 @@ function showAuthError(message) {
     el.classList.remove('hidden');
 }
 
-// Clears session and returns to auth screen
 function logout() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('username');
@@ -126,8 +116,7 @@ function logout() {
     showAuthScreen();
 }
 
-// ── Helpers: Authenticated fetch ──────────────────────────────────────────────
-// All API calls go through this so the JWT is always attached
+// ── Authenticated fetch helper ────────────────────────────────────────────────
 function authFetch(url, options = {}) {
     return fetch(url, {
         ...options,
@@ -152,7 +141,6 @@ async function onConnected() {
 // ── Groups ────────────────────────────────────────────────────────────────────
 async function fetchGroups() {
     try {
-        // NEW: uses authFetch so JWT is sent in Authorization header
         const res = await authFetch(`${API_BASE}/api/groups`);
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const groups = await res.json();
@@ -184,6 +172,10 @@ function switchGroup(groupId, groupName) {
     currentGroupId = groupId;
     setTitle(`# ${groupName}`);
     document.getElementById('messages').innerHTML = '';
+
+    // Hide delete banner when switching channels so it doesn't carry over
+    hideDeleteConfirm();
+
     currentSub?.unsubscribe();
     currentSub = stompClient.subscribe(`/topic/group.${groupId}`, msg => {
         appendMessage(JSON.parse(msg.body));
@@ -198,54 +190,111 @@ function highlightActiveGroup(groupId) {
     });
 }
 
-async function promptNewGroup() {
-    const name = prompt('Channel name:')?.trim();
-    if (!name) return;
+// ── New Channel Inline Form ───────────────────────────────────────────────────
+// REPLACED: prompt('Channel name') → inline form that appears in the sidebar
+
+// Toggles the inline form open or closed when + is clicked
+function toggleNewChannel() {
+    const form     = document.getElementById('new-channel-form');
+    const isHidden = form.classList.contains('hidden');
+
+    if (isHidden) {
+        // Show the form and focus the input so user can type immediately
+        form.classList.remove('hidden');
+        document.getElementById('new-channel-input').focus();
+        // Change + to × so user knows clicking again will close it
+        document.getElementById('new-channel-btn').textContent = '×';
+    } else {
+        cancelNewGroup();
+    }
+}
+
+// Hides the form and resets its state
+function cancelNewGroup() {
+    document.getElementById('new-channel-form').classList.add('hidden');
+    document.getElementById('new-channel-input').value = '';
+    // Restore + button
+    document.getElementById('new-channel-btn').textContent = '+';
+}
+
+// Called when user clicks Create or presses Enter inside the input
+async function confirmNewGroup() {
+    const name = document.getElementById('new-channel-input').value.trim();
+
+    if (!name) {
+        // REPLACED: alert('...') → toast so user gets feedback without a popup
+        showToast('Channel name cannot be empty', 'error');
+        return;
+    }
 
     try {
-        // NEW: uses authFetch, removed adminUsername from body (server gets it from JWT)
-        const res = await authFetch(`${API_BASE}/api/groups`, {
+        const res  = await authFetch(`${API_BASE}/api/groups`, {
             method: 'POST',
             body:   JSON.stringify({ name }),
         });
-        if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.message || 'Could not create channel');
-        }
-        await fetchGroups();
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Could not create channel');
+
+        cancelNewGroup();        // close and reset the form on success
+        await fetchGroups();     // refresh the channel list
+        // REPLACED: no feedback before → success toast
+        showToast(`#${name} created`, 'success');
     } catch (err) {
-        alert(err.message);
+        // REPLACED: alert(err.message) → error toast
+        showToast(err.message, 'error');
         console.error(err);
     }
 }
 
-async function deleteCurrentGroup() {
-    if (!currentGroupId)                              return;
-    if (!confirm('Delete this channel permanently?')) return;
+// ── Delete Confirmation Banner ────────────────────────────────────────────────
+// REPLACED: confirm('Are you sure?') → inline banner below the chat header
+
+// Shows the red confirmation banner when Delete button is clicked
+function showDeleteConfirm() {
+    if (!currentGroupId) {
+        // REPLACED: alert('Select a channel first') → info toast
+        showToast('Select a channel first', 'info');
+        return;
+    }
+    // Remove hidden to show the banner — CSS animates it sliding down
+    document.getElementById('delete-confirm').classList.remove('hidden');
+}
+
+// Hides the banner without doing anything — Cancel button
+function hideDeleteConfirm() {
+    document.getElementById('delete-confirm').classList.add('hidden');
+}
+
+// Called when user clicks "Yes, delete" inside the confirmation banner
+async function confirmDelete() {
+    hideDeleteConfirm(); // dismiss the banner immediately
 
     try {
-        // NEW: uses authFetch, removed ?admin= query param (server gets identity from JWT)
         const res = await authFetch(`${API_BASE}/api/groups/${currentGroupId}`, {
             method: 'DELETE',
         });
-        if (res.status === 403) throw new Error('Only the channel admin can delete it.');
+
+        if (res.status === 403) throw new Error('Only the channel admin can delete it');
         if (!res.ok)            throw new Error(`Delete failed (${res.status})`);
 
+        // Clean up state after successful deletion
         currentSub?.unsubscribe();
         currentSub     = null;
         currentGroupId = null;
         document.getElementById('messages').innerHTML = '';
         setTitle('Select a channel');
         await fetchGroups();
+        // REPLACED: no feedback after delete → info toast
+        showToast('Channel deleted', 'info');
     } catch (err) {
-        alert(err.message);
+        // REPLACED: alert(err.message) → error toast
+        showToast(err.message, 'error');
     }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 async function loadHistory(groupId) {
     try {
-        // NEW: uses authFetch
         const res = await authFetch(`${API_BASE}/chat/history/${groupId}`);
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const history = await res.json();
@@ -259,13 +308,18 @@ async function loadHistory(groupId) {
 function sendMessage() {
     const input   = document.getElementById('message-input');
     const content = input.value.trim();
-    if (!content)        return;
-    if (!currentGroupId) { alert('Select a channel first!'); return; }
+    if (!content) return;
+
+    if (!currentGroupId) {
+        // REPLACED: alert('Select a channel first') → info toast
+        showToast('Select a channel first', 'info');
+        return;
+    }
 
     stompClient.publish({
         destination: `/app/chat/${currentGroupId}`,
         body: JSON.stringify({
-            username,               // from session, identifies who sent it in the UI
+            username,
             content,
             groupId:     currentGroupId,
             messageType: 'CHAT',
@@ -304,6 +358,25 @@ function appendMessage(msg) {
 
     container.appendChild(msgEl);
     scrollToBottom();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+// NEW: replaces all alert() calls — shows a non-blocking notification at the bottom
+// type can be 'info' (black), 'success' (yellow), or 'error' (red)
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+
+    // Create the toast element
+    const toast = document.createElement('div');
+    toast.className   = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    // After 3 seconds, play the exit animation then remove from DOM
+    setTimeout(() => {
+        toast.style.animation = 'toastOut 0.2s ease forwards';
+        setTimeout(() => toast.remove(), 200); // wait for animation to finish before removing
+    }, 3000);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
