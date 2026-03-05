@@ -89,6 +89,13 @@ async function submitAuth() {
         username = data.username;
         sessionStorage.setItem('token', token);
         sessionStorage.setItem('username', username);
+        // If redirected here from an invite link, go finish joining
+        const pendingInvite = sessionStorage.getItem('pendingInvite');
+        if (pendingInvite) {
+            sessionStorage.removeItem('pendingInvite');
+            location.href = `/join/${pendingInvite}`;
+            return;
+        }
         showApp();
     } catch (err) {
         showAuthError('Could not reach the server');
@@ -395,4 +402,27 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+// ── Invite ────────────────────────────────────────────────────────────────────
+// Generates an invite link for the current channel and copies it to clipboard
+async function copyInvite() {
+    if (!currentGroupId) {
+        showToast('Select a channel first', 'info');
+        return;
+    }
+
+    try {
+        const res  = await authFetch(`${API_BASE}/api/groups/${currentGroupId}/invite`, {
+            method: 'POST',
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Could not generate invite');
+
+        // Copy the invite URL to clipboard
+        await navigator.clipboard.writeText(data.inviteUrl);
+        showToast('Invite link copied', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }

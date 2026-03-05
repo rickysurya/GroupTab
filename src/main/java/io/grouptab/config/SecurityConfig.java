@@ -29,29 +29,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                // Disable CSRF — not needed for stateless JWT APIs
                 .csrf(AbstractHttpConfigurer::disable)
-
-                // No server-side sessions — JWT carries all auth state
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
                 .authorizeHttpRequests(auth -> auth
-                        // Register and login are public — no token needed yet
                         .requestMatchers("/auth/**").permitAll()
-                        // WebSocket handshake must be public — JWT is sent later in STOMP CONNECT
                         .requestMatchers("/ws/**").permitAll()
-                        // Static frontend files are public
-                        .requestMatchers("/", "/index.html", "/*.js", "/*.css").permitAll()
-                        // Everything else requires a valid JWT
+                        .requestMatchers("/", "/index.html", "/join.html", "/join/**", "/*.js", "/*.css").permitAll()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
-                // Run our JWT filter before Spring's default username/password filter
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-    // Wires together our UserDetailsService and password encoder for login checks
+    // CHANGED: Spring Boot 4 requires UserDetailsService in the constructor, not via setter
     @Bean
     public AuthenticationProvider authenticationProvider() {
         var provider = new DaoAuthenticationProvider(userDetailsService);
@@ -59,13 +50,11 @@ public class SecurityConfig {
         return provider;
     }
 
-    // Exposed as a bean so AuthService can inject and use it for login
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // BCrypt is the standard for password hashing — slow by design to resist brute force
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

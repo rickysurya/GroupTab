@@ -56,7 +56,10 @@
         <div class="sidebar-section">
             <div class="sidebar-section-header">
                 <span>Channels</span>
-                <button class="btn-icon" onclick="toggleNewChannel()" title="New channel" id="new-channel-btn">+</button>
+                <div style="display:flex;gap:6px">
+                    <button class="btn-icon" onclick="copyInvite()" title="Copy invite link">⛓</button>
+                    <button class="btn-icon" onclick="toggleNewChannel()" title="New channel" id="new-channel-btn">+</button>
+                </div>
             </div>
 
             <!-- Inline new channel form — hidden by default -->

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join — GroupTab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+<div class="auth-screen">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <h1>GroupTab</h1>
+            <p id="join-subtitle">You've been invited to join a group</p>
+        </div>
+
+        <div id="join-error" class="auth-error hidden"></div>
+
+        <button class="btn-auth" id="join-btn" onclick="handleJoin()">Accept Invite</button>
+        <br/>
+        <a href="/" style="display:block; text-align:center; margin-top:14px; font-size:12px; color:#666; text-decoration:none;">
+            ← Back to GroupTab
+        </a>
+    </div>
+</div>
+
+<script>
+    const API_BASE = `${location.protocol}//${location.host}`;
+
+    // Extract the token from the URL path: /join/{token}
+    const token     = location.pathname.split('/join/')[1];
+    const authToken = sessionStorage.getItem('token');
+
+    async function handleJoin() {
+        // If not logged in, redirect to login and come back after
+        if (!authToken) {
+            sessionStorage.setItem('pendingInvite', token);
+            location.href = '/';
+            return;
+        }
+
+        const btn = document.getElementById('join-btn');
+        btn.disabled    = true;
+        btn.textContent = 'Joining...';
+
+        try {
+            const res  = await fetch(`${API_BASE}/api/groups/join/${token}`, {
+                method:  'POST',
+                headers: {
+                    'Content-Type':  'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                },
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.message || 'Could not join group');
+
+            // Redirect to main app after joining
+            location.href = '/';
+        } catch (err) {
+            document.getElementById('join-error').textContent = err.message;
+            document.getElementById('join-error').classList.remove('hidden');
+            btn.disabled    = false;
+            btn.textContent = 'Accept Invite';
+        }
+    }
+</script>
+</body>
+</html>

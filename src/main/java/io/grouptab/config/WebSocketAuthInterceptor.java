@@ -1,5 +1,7 @@
 package io.grouptab.config;
 
+import io.grouptab.repository.GroupMemberRepository;
+import io.grouptab.repository.UserRepository;
 import io.grouptab.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;
@@ -12,36 +14,65 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
-// WebSocket equivalent of JwtFilter
-// JwtFilter handles HTTP requests — this handles STOMP frames
-// When a client connects via WebSocket they send a STOMP CONNECT frame
-// with the JWT in the Authorization header — this intercepts that and validates it
 @Component
 @RequiredArgsConstructor
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
-    private final JwtUtil jwtUtil;
-    private final UserDetailsService userDetailsService;
+    private final JwtUtil               jwtUtil;
+    private final UserDetailsService    userDetailsService;
+    private final UserRepository        userRepository;
+    private final GroupMemberRepository memberRepository;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         var accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) return message;
 
-        // Only care about the initial CONNECT frame — not every message
-        if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+        // ── CONNECT: validate JWT and set user on the session ────────────────
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
-
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 if (jwtUtil.isValid(token)) {
-                    String username = jwtUtil.extractUsername(token);
-                    var userDetails = userDetailsService.loadUserByUsername(username);
-
-                    // Set the authenticated user on the STOMP session
-                    // This makes principal.getName() available in @MessageMapping methods
-                    var auth = new UsernamePasswordAuthenticationToken(
+                    String username    = jwtUtil.extractUsername(token);
+                    var    userDetails = userDetailsService.loadUserByUsername(username);
+                    var    auth        = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
                     accessor.setUser(auth);
+                }
+            }
+        }
+
+        // ── SUBSCRIBE: verify the user is a member of the group they're subscribing to ──
+        // Destination format: /topic/group.{groupId}
+        if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+            String destination = accessor.getDestination();
+
+            if (destination != null && destination.startsWith("/topic/group.")) {
+                // Extract groupId from the destination
+                String groupIdStr = destination.substring("/topic/group.".length());
+
+                try {
+                    Long groupId = Long.parseLong(groupIdStr);
+
+                    // Get the authenticated user from the STOMP session
+                    var principal = accessor.getUser();
+                    if (principal == null) {
+                        // No auth set — reject
+                        throw new IllegalStateException("Unauthorized");
+                    }
+
+                    // Look up the user in DB
+                    var user = userRepository.findByUsername(principal.getName())
+                            .orElseThrow(() -> new IllegalStateException("User not found"));
+
+                    // Check they're actually a member of this group
+                    if (!memberRepository.existsByUserIdAndGroupId(user.getId(), groupId)) {
+                        throw new IllegalStateException("Not a member of this group");
+                    }
+
+                } catch (NumberFormatException e) {
+                    throw new IllegalStateException("Invalid group destination");
                 }
             }
         }

@@ -24,8 +24,5 @@ public class ChatGroup {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @NotBlank(message = "Admin username must not be blank")
-    @Size(max = 100, message = "Admin username must not exceed 100 characters")
-    @Column(nullable = false)
-    private String adminUsername;
+
 }

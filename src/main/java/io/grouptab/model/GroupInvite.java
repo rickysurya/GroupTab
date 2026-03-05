@@ -13,31 +13,26 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "group_members", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"user_id", "group_id"})
-})
-public class GroupMember {
+@Table(name = "group_invites")
+public class GroupInvite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    // The unique token that forms the invite link — e.g. /join/abc123xyz
+    @Column(nullable = false, unique = true)
+    private String token;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
     private ChatGroup group;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
-    @Column(nullable = false)
-    private Instant joinedAt;
-
-    public enum Role {
-        ADMIN, MEMBER
-    }
+    // Null means the invite never expires
+    @Column
+    private Instant expiresAt;
 }
