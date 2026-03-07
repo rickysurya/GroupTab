@@ -18,8 +18,8 @@ function createStompClient() {
     return new StompJs.Client({
         brokerURL:         WS_URL,
         reconnectDelay:    5000,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
+        heartbeatIncoming: 0,
+        heartbeatOutgoing: 20000,
         connectHeaders:    { Authorization: `Bearer ${token}` },
         onConnect:    onConnected,
         onStompError: frame => {
@@ -140,13 +140,23 @@ function authFetch(url, options = {}) {
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
+// CHANGED: added reconnect logic to reload history on reconnect
+let isFirstConnect = true;
 async function onConnected() {
     const groups = await fetchGroups();
     if (groups.length > 0) {
-        switchGroup(groups[0].id, groups[0].name);
+        if (isFirstConnect) {
+            switchGroup(groups[0].id, groups[0].name);
+        } else {
+            const groupId = currentGroupId || groups[0].id;
+            const group   = groups.find(g => g.id === groupId) || groups[0];
+            currentGroupId = null;
+            switchGroup(group.id, group.name);
+        }
     } else {
         setTitle('Create a channel to get started');
     }
+    isFirstConnect = false;
 }
 
 // ── Groups ────────────────────────────────────────────────────────────────────
