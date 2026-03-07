@@ -28,10 +28,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class GroupService {
 
-    private final ChatGroupRepository    groupRepository;
-    private final GroupMemberRepository  memberRepository;
-    private final GroupInviteRepository  inviteRepository;
-    private final UserRepository         userRepository;
+    private final ChatGroupRepository groupRepository;
+    private final GroupMemberRepository memberRepository;
+    private final GroupInviteRepository inviteRepository;
+    private final UserRepository userRepository;
 
     // Returns only groups the authenticated user is a member of
     public List<GroupResponse> getMyGroups() {
@@ -60,7 +60,7 @@ public class GroupService {
         member.setRole(Role.ADMIN);
         member.setJoinedAt(Instant.now());
         memberRepository.save(member);
-
+        System.out.println(group.getName());
         return new GroupResponse(saved.getId(), saved.getName(), Role.ADMIN.name());
     }
 
@@ -123,8 +123,8 @@ public class GroupService {
         inviteRepository.save(invite);
 
         // Build the full invite URL the frontend can display or copy
-        String baseUrl    = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
-        String inviteUrl  = baseUrl + "/join/" + token;
+        String baseUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort();
+        String inviteUrl = baseUrl + "/join/" + token;
 
         return new InviteResponse(token, inviteUrl);
     }

@@ -57,6 +57,12 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
                     // Get the authenticated user from the STOMP session
                     var principal = accessor.getUser();
+
+                    //only for debug
+                    System.out.println("SUBSCRIBE DEBUG: destination=" + destination
+                            + " groupId=" + groupId
+                            + " principal=" + (principal != null ? principal.getName() : "NULL"));
+
                     if (principal == null) {
                         // No auth set — reject
                         throw new IllegalStateException("Unauthorized");
@@ -65,6 +71,10 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                     // Look up the user in DB
                     var user = userRepository.findByUsername(principal.getName())
                             .orElseThrow(() -> new IllegalStateException("User not found"));
+
+                    // only for debug
+                    boolean isMember = memberRepository.existsByUserIdAndGroupId(user.getId(), groupId);
+                    System.out.println("SUBSCRIBE DEBUG: userId=" + user.getId() + " isMember=" + isMember);
 
                     // Check they're actually a member of this group
                     if (!memberRepository.existsByUserIdAndGroupId(user.getId(), groupId)) {

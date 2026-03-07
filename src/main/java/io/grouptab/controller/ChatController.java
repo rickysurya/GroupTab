@@ -20,7 +20,7 @@ public class ChatController {
     @MessageMapping("/chat/{groupId}")
     @SendTo("/topic/group.{groupId}")
     public ChatMessage sendMessage(@DestinationVariable Long groupId, ChatMessage message){
-        return chatService.sendMessage(groupId, message);
+        return chatService.processAndSave(groupId, message);
     }
 
     @GetMapping("/chat/history/{groupId}")

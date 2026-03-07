@@ -26,6 +26,7 @@ public class User {
 
     // Always stored as a bcrypt hash — never plain text
     @NotBlank
+    @Size(min = 8, max = 100)
     @Column(nullable = false)
     private String password;
 }

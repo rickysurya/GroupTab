@@ -12,19 +12,22 @@ let currentGroupId = null;
 let currentSub     = null;
 
 // ── STOMP Client ──────────────────────────────────────────────────────────────
-const stompClient = new StompJs.Client({
-    brokerURL:         WS_URL,
-    reconnectDelay:    5000,
-    heartbeatIncoming: 4000,
-    heartbeatOutgoing: 4000,
-    connectHeaders: () => ({ Authorization: `Bearer ${token}` }),
-    onConnect:    onConnected,
-    onStompError: frame => {
-        console.error('STOMP error:', frame.headers['message'], frame.body);
-        // CHANGED: was console.error only, now also shows a toast so user knows connection failed
-        showToast('Connection error — retrying...', 'error');
-    },
-});
+let stompClient = null;
+
+function createStompClient() {
+    return new StompJs.Client({
+        brokerURL:         WS_URL,
+        reconnectDelay:    5000,
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+        connectHeaders:    { Authorization: `Bearer ${token}` },
+        onConnect:    onConnected,
+        onStompError: frame => {
+            console.error('STOMP error:', frame.headers['message'], frame.body);
+            showToast('Connection error — retrying...', 'error');
+        },
+    });
+}
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 if (token && username) {
@@ -44,6 +47,7 @@ function showApp() {
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('display-username').textContent = username;
     document.getElementById('user-avatar').textContent      = username.charAt(0).toUpperCase();
+    stompClient = createStompClient();
     stompClient.activate();
 }
 
@@ -239,6 +243,8 @@ async function confirmNewGroup() {
             method: 'POST',
             body:   JSON.stringify({ name }),
         });
+
+        console.log(`${API_BASE}/api/groups`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Could not create channel');
 
