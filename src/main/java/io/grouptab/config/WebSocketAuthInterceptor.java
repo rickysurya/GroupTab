@@ -6,6 +6,7 @@ import io.grouptab.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
@@ -31,16 +32,18 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         // ── CONNECT: validate JWT and set user on the session ────────────────
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String authHeader = accessor.getFirstNativeHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                if (jwtUtil.isValid(token)) {
-                    String username    = jwtUtil.extractUsername(token);
-                    var    userDetails = userDetailsService.loadUserByUsername(username);
-                    var    auth        = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    accessor.setUser(auth);
-                }
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) { // ← rejects if missing
+                throw new MessagingException("Missing authorization header");
             }
+            String token = authHeader.substring(7);
+            if (!jwtUtil.isValid(token)) {                                 // ← rejects if invalid
+                throw new MessagingException("Invalid or expired token");
+            }
+            String username    = jwtUtil.extractUsername(token);
+            var    userDetails = userDetailsService.loadUserByUsername(username);
+            var    auth        = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities());
+            accessor.setUser(auth);                                        // ← unchanged
         }
 
         // ── SUBSCRIBE: verify the user is a member of the group they're subscribing to ──
