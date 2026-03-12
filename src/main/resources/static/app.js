@@ -12,6 +12,7 @@ let currentGroupId = null;
 let currentSub     = null;
 
 // ── STOMP Client ──────────────────────────────────────────────────────────────
+// stompClient is created in showApp() so connectHeaders has the token available
 let stompClient = null;
 
 function createStompClient() {
@@ -140,17 +141,20 @@ function authFetch(url, options = {}) {
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
-// CHANGED: added reconnect logic to reload history on reconnect
 let isFirstConnect = true;
+
 async function onConnected() {
     const groups = await fetchGroups();
     if (groups.length > 0) {
         if (isFirstConnect) {
+            // First connect — switch to first group normally
             switchGroup(groups[0].id, groups[0].name);
         } else {
+            // Reconnect — re-subscribe to current group and reload history
+            // to catch any messages missed during the dead window
             const groupId = currentGroupId || groups[0].id;
             const group   = groups.find(g => g.id === groupId) || groups[0];
-            currentGroupId = null;
+            currentGroupId = null; // force switchGroup to re-subscribe
             switchGroup(group.id, group.name);
         }
     } else {
@@ -202,6 +206,7 @@ function switchGroup(groupId, groupName) {
         appendMessage(JSON.parse(msg.body));
     });
     loadHistory(groupId);
+    loadExpensePanel(groupId);
     highlightActiveGroup(groupId);
 }
 
@@ -234,27 +239,24 @@ function toggleNewChannel() {
 function cancelNewGroup() {
     document.getElementById('new-channel-form').classList.add('hidden');
     document.getElementById('new-channel-input').value = '';
+    document.getElementById('new-channel-currency').value = '';
     // Restore + button
     document.getElementById('new-channel-btn').textContent = '+';
 }
 
 // Called when user clicks Create or presses Enter inside the input
 async function confirmNewGroup() {
-    const name = document.getElementById('new-channel-input').value.trim();
+    const name     = document.getElementById('new-channel-input').value.trim();
+    const currency = document.getElementById('new-channel-currency').value.trim().toUpperCase();
 
-    if (!name) {
-        // REPLACED: alert('...') → toast so user gets feedback without a popup
-        showToast('Channel name cannot be empty', 'error');
-        return;
-    }
+    if (!name)     { showToast('Channel name cannot be empty', 'error'); return; }
+    if (!currency) { showToast('Currency is required e.g. IDR', 'error'); return; }
 
     try {
         const res  = await authFetch(`${API_BASE}/api/groups`, {
             method: 'POST',
-            body:   JSON.stringify({ name }),
+            body:   JSON.stringify({ name, currency }),
         });
-
-        console.log(`${API_BASE}/api/groups`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Could not create channel');
 
@@ -441,4 +443,281 @@ async function copyInvite() {
     } catch (err) {
         showToast(err.message, 'error');
     }
+}
+
+// ── Expense State ─────────────────────────────────────────────────────────────
+let groupMembers = [];
+let groupCurrency = 'IDR';
+
+// ── Expense Panel ─────────────────────────────────────────────────────────────
+async function loadExpensePanel(groupId) {
+    await loadGroupMembers(groupId);
+    await loadBalances();
+    await loadExpenseHistory(groupId);
+}
+
+async function loadGroupMembers(groupId) {
+    try {
+        const res = await authFetch(`${API_BASE}/api/groups/${groupId}/members`);
+        if (!res.ok) return;
+        groupMembers = await res.json();
+    } catch (err) {
+        console.error('Failed to load members:', err);
+    }
+}
+
+// ── Add Expense Form ──────────────────────────────────────────────────────────
+function toggleAddExpense() {
+    const form = document.getElementById('add-expense-form');
+    const isHidden = form.classList.contains('hidden');
+    if (isHidden) {
+        if (!currentGroupId) { showToast('Select a channel first', 'info'); return; }
+        form.classList.remove('hidden');
+        document.getElementById('add-expense-btn').textContent = '×';
+        populateExpenseForm();
+    } else {
+        cancelAddExpense();
+    }
+}
+
+function cancelAddExpense() {
+    document.getElementById('add-expense-form').classList.add('hidden');
+    document.getElementById('add-expense-btn').textContent = '+';
+    resetExpenseForm();
+}
+
+function resetExpenseForm() {
+    document.getElementById('expense-title').value = '';
+    document.getElementById('expense-amount').value = '';
+    document.getElementById('expense-split-type').value = 'EQUAL';
+    document.getElementById('expense-members-group').classList.remove('hidden');
+    document.getElementById('expense-amount-group').classList.remove('hidden');
+    document.getElementById('custom-splits-group').classList.add('hidden');
+}
+
+function populateExpenseForm() {
+    // Paid by dropdown
+    const paidBySelect = document.getElementById('expense-paid-by');
+    paidBySelect.innerHTML = '';
+    groupMembers.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.userId;
+        opt.textContent = m.username;
+        if (m.username === username) opt.selected = true;
+        paidBySelect.appendChild(opt);
+    });
+
+    // Members checklist
+    const list = document.getElementById('expense-members-list');
+    list.innerHTML = '';
+    groupMembers.forEach(m => {
+        const label = document.createElement('label');
+        label.innerHTML = `
+            <input type="checkbox" value="${m.userId}" checked />
+            ${escapeHtml(m.username)}
+        `;
+        list.appendChild(label);
+    });
+}
+
+function onSplitTypeChange() {
+    const type = document.getElementById('expense-split-type').value;
+    const membersGroup = document.getElementById('expense-members-group');
+    const customGroup  = document.getElementById('custom-splits-group');
+
+    if (type === 'CUSTOM') {
+        membersGroup.classList.add('hidden');
+        customGroup.classList.remove('hidden');
+        renderCustomSplitRows();
+    } else {
+        membersGroup.classList.remove('hidden');
+        customGroup.classList.add('hidden');
+    }
+}
+
+function renderCustomSplitRows() {
+    const container = document.getElementById('custom-splits-list');
+    container.innerHTML = '';
+    groupMembers.forEach(m => {
+        const row = document.createElement('div');
+        row.className = 'custom-split-row';
+        row.innerHTML = `
+            <span>${escapeHtml(m.username)}</span>
+            <input type="number" placeholder="0" min="0" data-user-id="${m.userId}" />
+        `;
+        container.appendChild(row);
+    });
+}
+
+async function submitExpense() {
+    const title     = document.getElementById('expense-title').value.trim();
+    const splitType = document.getElementById('expense-split-type').value;
+    const paidById  = Number(document.getElementById('expense-paid-by').value);
+    const amount    = document.getElementById('expense-amount').value;
+
+    if (!title) { showToast('Title is required', 'error'); return; }
+
+    let body = { title, paidById: paidById, splitType };
+
+    if (splitType === 'EQUAL') {
+        if (!amount) { showToast('Amount is required', 'error'); return; }
+        const checked = [...document.querySelectorAll('#expense-members-list input:checked')];
+        if (checked.length === 0) { showToast('Select at least one member', 'error'); return; }
+        body.totalAmount = parseFloat(amount);
+        body.splitAmong  = checked.map(c => Number(c.value));
+
+    } else if (splitType === 'CUSTOM') {
+        if (!amount) { showToast('Amount is required', 'error'); return; }
+        const rows = [...document.querySelectorAll('#custom-splits-list input')];
+        const splits = rows
+            .filter(r => r.value && parseFloat(r.value) > 0)
+            .map(r => ({ userId: Number(r.dataset.userId), amount: parseFloat(r.value) }));
+        if (splits.length === 0) { showToast('Enter amounts for members', 'error'); return; }
+        body.totalAmount   = parseFloat(amount);
+        body.customSplits  = splits;
+    }
+
+    try {
+        const res = await authFetch(`${API_BASE}/api/groups/${currentGroupId}/expenses`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Could not add expense');
+        cancelAddExpense();
+        showToast(`${title} added`, 'success');
+        await loadExpensePanel(currentGroupId);
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+// ── Balances ──────────────────────────────────────────────────────────────────
+async function loadBalances() {
+    if (!currentGroupId) return;
+    try {
+        const res = await authFetch(`${API_BASE}/api/groups/${currentGroupId}/expenses/balances`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        renderBalances(data.balances);
+        renderSettlements(data.suggestions);
+    } catch (err) {
+        document.getElementById('balances-list').innerHTML =
+            '<div class="expense-empty">Could not load balances</div>';
+    }
+}
+
+function renderBalances(balances) {
+    const container = document.getElementById('balances-list');
+    if (!balances || balances.length === 0) {
+        container.innerHTML = '<div class="expense-empty">No expenses yet</div>';
+        return;
+    }
+    container.innerHTML = '';
+    balances.forEach(b => {
+        const net   = parseFloat(b.netBalance);
+        const cls   = net > 0 ? 'positive' : net < 0 ? 'negative' : 'zero';
+        const sign  = net > 0 ? '+' : '';
+        const row   = document.createElement('div');
+        row.className = 'balance-row';
+        row.innerHTML = `
+            <span class="bal-name">${escapeHtml(b.username)}</span>
+            <span class="bal-amount ${cls}">${sign}${formatAmount(net)}</span>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function renderSettlements(suggestions) {
+    const container = document.getElementById('settlements-list');
+    if (!suggestions || suggestions.length === 0) {
+        container.innerHTML = '<div class="expense-empty">All settled up</div>';
+        return;
+    }
+    container.innerHTML = '';
+    suggestions.forEach(s => {
+        const isMe = s.fromUsername === username;
+        const row  = document.createElement('div');
+        row.className = 'settlement-row';
+        row.innerHTML = `
+            <div class="settlement-desc">
+                <strong>${escapeHtml(s.fromUsername)}</strong> → <strong>${escapeHtml(s.toUsername)}</strong>
+            </div>
+            <div class="settlement-amount">${formatAmount(s.amount)}</div>
+            ${isMe ? `<button class="btn-settle" onclick="settle(${s.toUserId}, ${s.amount})">Mark Settled</button>` : ''}
+        `;
+        container.appendChild(row);
+    });
+}
+
+async function settle(toUserId, amount) {
+    try {
+        const myId = groupMembers.find(m => m.username === username)?.userId;
+        if (!myId) return;
+        const res = await authFetch(
+            `${API_BASE}/api/groups/${currentGroupId}/expenses/settle?fromUserId=${myId}&toUserId=${toUserId}&amount=${amount}`,
+            { method: 'POST' }
+        );
+        if (!res.ok) throw new Error('Could not settle');
+        showToast('Marked as settled', 'success');
+        await loadBalances();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+// ── Expense History ───────────────────────────────────────────────────────────
+async function loadExpenseHistory(groupId) {
+    try {
+        const res = await authFetch(`${API_BASE}/api/groups/${groupId}/expenses`);
+        if (!res.ok) throw new Error();
+        const expenses = await res.json();
+        renderExpenseHistory(expenses);
+    } catch (err) {
+        document.getElementById('expense-history').innerHTML =
+            '<div class="expense-empty">Could not load history</div>';
+    }
+}
+
+function renderExpenseHistory(expenses) {
+    const container = document.getElementById('expense-history');
+    if (!expenses || expenses.length === 0) {
+        container.innerHTML = '<div class="expense-empty">No expenses yet</div>';
+        return;
+    }
+    container.innerHTML = '';
+    expenses.forEach(e => {
+        const item = document.createElement('div');
+        item.className = 'expense-item';
+        item.innerHTML = `
+            <div class="expense-item-header">
+                <span class="expense-item-title">${escapeHtml(e.title)}</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span class="expense-item-amount">${formatAmount(e.totalAmount)}</span>
+                    <button class="btn-delete-expense" onclick="deleteExpense(${e.id})" title="Delete">×</button>
+                </div>
+            </div>
+            <div class="expense-item-meta">paid by ${escapeHtml(e.paidByUsername)} · ${e.splitType.toLowerCase()}</div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+async function deleteExpense(expenseId) {
+    try {
+        const res = await authFetch(`${API_BASE}/api/groups/${currentGroupId}/expenses/${expenseId}`, {
+            method: 'DELETE',
+        });
+        if (res.status === 403) throw new Error('Only creator or admin can delete');
+        if (!res.ok) throw new Error('Could not delete expense');
+        showToast('Expense deleted', 'info');
+        await loadExpensePanel(currentGroupId);
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatAmount(amount) {
+    return new Intl.NumberFormat('id-ID').format(Math.abs(parseFloat(amount)));
 }
