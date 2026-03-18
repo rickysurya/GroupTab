@@ -33,8 +33,22 @@ stomp:
   port: 61613
 
 jwt:
-  secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production-minimum-32-chars}
+  secret: ${JWT_SECRET:256-bit-secret-key-change-this-in-production-minimum-32-chars}
   expiration-ms: 86400000 # 24 hours
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when-authorized
+logging:
+  level:
+    root: INFO
+    io.grouptab: DEBUG
+  file:
+    name: logs/grouptab.log
 server:
   port: 8080
